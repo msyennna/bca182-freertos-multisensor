@@ -168,9 +168,14 @@ bool ReadLdr(uint32_t &raw, uint32_t &percent)
 void SensorTask(void *argument)
 {
     (void)argument;
+
     Serial_WriteRaw("[SensorTask] started\r\n");
-    // Let the sensor stabilize before the first transaction.
+
+    // One-time startup delay for the DHT22.
     vTaskDelay(pdMS_TO_TICKS(2000));
+
+    // Reference time for periodic sampling.
+    TickType_t lastWakeTime = xTaskGetTickCount();
 
     for (;;) {
         float temperature = 0.0f;
@@ -206,8 +211,8 @@ void SensorTask(void *argument)
         }
         Serial_Print("\r\n");
 
-        // BLOCKED for two seconds between readings; Idle can run.
-        vTaskDelay(pdMS_TO_TICKS(2000));
+                // Wait until the next scheduled 2-second sampling time.
+        vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(2000));
     }
 }
 
