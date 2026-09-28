@@ -22,7 +22,6 @@ void PrintReceived(const char *consumer, const SensorData &data)
                   "[%s] T=%s C | H=%s %% | ADC level=%d %% | Motion=%s\r\n",
                   consumer, temperature, humidity, data.lightLevel,
                   data.motionDetected ? "YES" : "NO");
-    // One mutex-protected call keeps each consumer's whole line together.
     Serial_Print(line);
 }
 
@@ -79,12 +78,10 @@ void DisplayTask(void *argument)
                 Serial_Print("[DisplayTask] OLED off; waiting for motion\r\n");
             }
             displaySleeping = true;
-            // No periodic framebuffer/I2C work while inactive.
             xEventGroupWaitBits(systemEvents, EVENT_ACTIVE, pdFALSE, pdTRUE, portMAX_DELAY);
             continue;
         }
         if (displaySleeping) {
-            // Reinitialize on wake, which turns the display on and refreshes it.
             displaySleeping = false;
             oledReady = false;
             haveSample = false;
@@ -129,7 +126,6 @@ void DisplayTask(void *argument)
             oledReady = DrawSelectedPage(mode, received, fresh, alarmActive);
             if (!oledReady) Serial_Print("[DisplayTask] OLED update failed\r\n");
         }
-        // Respond to navigation without waiting for the next 2-second sample.
         vTaskDelay(pdMS_TO_TICKS(50));
     }
 }

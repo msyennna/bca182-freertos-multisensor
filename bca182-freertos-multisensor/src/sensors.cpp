@@ -175,8 +175,6 @@ void SensorTask(void *argument)
         data.motionDetected = (xEventGroupGetBits(systemEvents) & EVENT_MOTION) != 0;
 
         if (dhtOk && ldrOk) {
-            // Separate length-one queues give both consumers their own copy.
-            // A slow consumer gets the latest sample, not a historical backlog.
             xQueueOverwrite(displaySensorQueue, &data);
             xQueueOverwrite(alarmSensorQueue, &data);
         } else {

@@ -3,7 +3,6 @@
 QueueHandle_t displaySensorQueue = nullptr;
 QueueHandle_t alarmSensorQueue = nullptr;
 QueueHandle_t displayModeQueue = nullptr;
-QueueHandle_t motionStateQueue = nullptr;
 SemaphoreHandle_t serialMutex = nullptr;
 EventGroupHandle_t systemEvents = nullptr;
 

@@ -27,7 +27,6 @@ void AlarmTask(void *argument)
         if (xQueueReceive(alarmSensorQueue, &received, pdMS_TO_TICKS(100)) == pdPASS) {
             if ((xEventGroupGetBits(systemEvents) & EVENT_ACTIVE) == 0) continue;
             const AlarmState state = evaluateTemperature(received.temperature);
-            // Persistent state flag, not a counted/one-shot notification.
             const bool alarmActive = state != AlarmState::NORMAL;
             const bool previouslySet = (xEventGroupGetBits(systemEvents) & EVENT_ALARM) != 0;
             if (alarmActive) {
@@ -51,8 +50,6 @@ void AlarmTask(void *argument)
             std::snprintf(line, sizeof(line), "[AlarmTask] T=%s C | State=%s\r\n",
                           temperature, name);
             Serial_Print(line);
-            // Pure decision above; hardware action belongs only to AlarmTask.
-            // TIM2 generates the tone independently while this task blocks.
             const bool shouldSound = alarmActive &&
                 ((xEventGroupGetBits(systemEvents) & EVENT_ACTIVE) != 0);
             Buzzer_Set(shouldSound);
