@@ -1,0 +1,20 @@
+{
+  "name": "FreeRTOS",
+  "version": "10.3.1-cubemx",
+  "build": {
+    "srcDir": ".",
+    "srcFilter": [
+      "+<tasks.c>",
+      "+<queue.c>",
+      "+<list.c>",
+      "+<event_groups.c>",
+      "+<stream_buffer.c>",
+      "+<portable/GCC/ARM_CM3/port.c>",
+      "+<portable/MemMang/heap_4.c>"
+    ],
+    "flags": [
+      "-I include",
+      "-I portable/GCC/ARM_CM3"
+    ]
+  }
+}
