@@ -326,10 +326,14 @@ void AlarmTask(void *argument)
 {
     (void)argument;
     SensorData received = {};
+    bool buzzerOn = false;
+    Buzzer_Set(false);
     for (;;) {
         if ((xEventGroupGetBits(systemEvents) & EVENT_ACTIVE) == 0) {
             xEventGroupClearBits(systemEvents, EVENT_ALARM);
             Buzzer_Set(false);
+            if (buzzerOn) Serial_Print("[Buzzer] OFF: system INACTIVE\r\n");
+            buzzerOn = false;
             Serial_Print("[AlarmTask] Paused while INACTIVE\r\n");
             xEventGroupWaitBits(systemEvents, EVENT_ACTIVE, pdFALSE, pdTRUE, portMAX_DELAY);
         }
@@ -354,14 +358,22 @@ void AlarmTask(void *argument)
                 case AlarmState::LOW_TEMPERATURE: name = "LOW_TEMPERATURE"; break;
                 case AlarmState::HIGH_TEMPERATURE: name = "HIGH_TEMPERATURE"; break;
             }
-            
             char temperature[20];
             char line[100];
             FormatTemperature(received.temperature, temperature, sizeof(temperature));
             std::snprintf(line, sizeof(line), "[AlarmTask] T=%s C | State=%s\r\n",
                           temperature, name);
             Serial_Print(line);
-            // Hardware action is intentionally separate; add buzzer control later.
+            // Pure decision above; hardware action belongs only to AlarmTask.
+            // TIM2 generates the tone independently while this task blocks.
+            const bool shouldSound = alarmActive &&
+                ((xEventGroupGetBits(systemEvents) & EVENT_ACTIVE) != 0);
+            Buzzer_Set(shouldSound);
+            if (shouldSound != buzzerOn) {
+                Serial_Print(shouldSound ? "[Buzzer] ON: temperature alarm\r\n"
+                                         : "[Buzzer] OFF\r\n");
+            }
+            buzzerOn = shouldSound;
         }
     }
 }
@@ -397,7 +409,7 @@ int main(void)
     if (xTaskCreate(InputTask, "InputTask", 256, nullptr, 1, nullptr) != pdPASS) {
         Stop("InputTask creation failed\r\n");
     }
-    Serial_WriteRaw("Motion + system state test: first reading in about 2 seconds.\r\n");
+    Serial_WriteRaw("Room monitor + buzzer: first reading in about 2 seconds.\r\n");
     vTaskStartScheduler();
     Stop("Scheduler failed to start\r\n");
 }

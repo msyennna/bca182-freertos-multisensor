@@ -64,6 +64,16 @@
         "delayTime": "3",
         "inhibitTime": "1"
       }
+    },
+    {
+      "type": "wokwi-buzzer",
+      "id": "buzzer",
+      "top": 170,
+      "left": 650,
+      "attrs": {
+        "volume": "1.0",
+        "mode": "smooth"
+      }
     }
   ],
   "connections": [
@@ -191,6 +201,18 @@
       "pir:OUT",
       "stm32:B1",
       "blue",
+      []
+    ],
+    [
+      "buzzer:1",
+      "stm32:GND.3",
+      "black",
+      []
+    ],
+    [
+      "buzzer:2",
+      "stm32:A2",
+      "orange",
       []
     ]
   ],

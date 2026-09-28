@@ -70,7 +70,7 @@ void Hardware_Init(void)
 void Buzzer_Set(bool enabled)
 {
     /* TIM2 is the CubeMX-generated 1 MHz HAL time base. Channel 3 shares the
-     * same counter and can therefore provide a 1 kHz PWM signal on PB10. */
+     * same counter and can therefore provide a 1 kHz PWM signal on PA2. */
     __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, enabled ? 500U : 0U);
 }
 
@@ -84,7 +84,7 @@ void MX_GPIO_Init(void)
     __HAL_RCC_GPIOB_CLK_ENABLE();
     __HAL_RCC_GPIOC_CLK_ENABLE();
     __HAL_RCC_AFIO_CLK_ENABLE();
-    __HAL_AFIO_REMAP_TIM2_ENABLE();
+    __HAL_AFIO_REMAP_TIM2_DISABLE();
 
     /* DHT22 data. */
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
@@ -106,12 +106,12 @@ void MX_GPIO_Init(void)
     GPIO_InitStruct.Pull = GPIO_PULLUP;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-    /* PB10 = TIM2_CH3 buzzer PWM. */
-    GPIO_InitStruct.Pin = GPIO_PIN_10;
+    /* PA2 = default TIM2_CH3 buzzer PWM; no remap required. */
+    GPIO_InitStruct.Pin = GPIO_PIN_2;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 }
 
 void MX_ADC1_Init(void)
