@@ -354,6 +354,7 @@ void AlarmTask(void *argument)
                 case AlarmState::LOW_TEMPERATURE: name = "LOW_TEMPERATURE"; break;
                 case AlarmState::HIGH_TEMPERATURE: name = "HIGH_TEMPERATURE"; break;
             }
+            
             char temperature[20];
             char line[100];
             FormatTemperature(received.temperature, temperature, sizeof(temperature));
