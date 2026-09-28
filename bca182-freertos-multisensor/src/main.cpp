@@ -386,30 +386,47 @@ void Stop(const char *message)
 }
 
 } // namespace
-
 int main(void)
 {
     Serial_EarlyInit();
-    Hardware_Init(); // Includes PB0 and the 1 MHz TIM4 sensor timer.
+    Hardware_Init();
 
     if (!RtosObjects_Create()) {
         Stop("RTOS object creation failed\r\n");
     }
-    if (xTaskCreate(MotionTask, "MotionTask", 256, nullptr, 1, nullptr) != pdPASS) {
+
+    // Highest application priority: prompt motion and input handling.
+    if (xTaskCreate(MotionTask, "MotionTask",
+                    256, nullptr, 3, nullptr) != pdPASS) {
         Stop("MotionTask creation failed\r\n");
     }
-    if (xTaskCreate(SensorTask, "SensorTask", 384, nullptr, 1, nullptr) != pdPASS) {
+
+    if (xTaskCreate(InputTask, "InputTask",
+                    256, nullptr, 3, nullptr) != pdPASS) {
+        Stop("InputTask creation failed\r\n");
+    }
+
+    // Medium priority: sensor acquisition and alarm decisions.
+    if (xTaskCreate(SensorTask, "SensorTask",
+                    384, nullptr, 2, nullptr) != pdPASS) {
         Stop("SensorTask creation failed\r\n");
     }
 
-    if (xTaskCreate(DisplayTask, "DisplayTask", 512, nullptr, 1, nullptr) != pdPASS ||
-        xTaskCreate(AlarmTask, "AlarmTask", 384, nullptr, 1, nullptr) != pdPASS) {
-        Stop("Consumer task creation failed\r\n");
+    if (xTaskCreate(AlarmTask, "AlarmTask",
+                    384, nullptr, 2, nullptr) != pdPASS) {
+        Stop("AlarmTask creation failed\r\n");
     }
-    if (xTaskCreate(InputTask, "InputTask", 256, nullptr, 1, nullptr) != pdPASS) {
-        Stop("InputTask creation failed\r\n");
+
+    // Lower priority: visual updates can tolerate some delay.
+    if (xTaskCreate(DisplayTask, "DisplayTask",
+                    512, nullptr, 1, nullptr) != pdPASS) {
+        Stop("DisplayTask creation failed\r\n");
     }
-    Serial_WriteRaw("Room monitor + buzzer: first reading in about 2 seconds.\r\n");
+
+    Serial_WriteRaw(
+        "Priorities: Motion=3 Input=3 Sensor=2 Alarm=2 Display=1\r\n"
+    );
+
     vTaskStartScheduler();
     Stop("Scheduler failed to start\r\n");
 }
