@@ -1,13 +1,83 @@
 {
   "version": 1,
-  "author": "BCA182",
+  "author": "Ni-ear",
   "editor": "wokwi",
   "parts": [
-    { "type": "board-stm32-bluepill", "id": "stm32", "top": 0, "left": 0, "attrs": {} }
+    {
+      "type": "board-stm32-bluepill",
+      "id": "stm32",
+      "top": 40,
+      "left": 220,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-dht22",
+      "id": "dht",
+      "top": -130,
+      "left": -30,
+      "attrs": {
+        "temperature": "25.4",
+        "humidity": "61.2"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "dhtPullup",
+      "top": -60,
+      "left": 95,
+      "rotate": 90,
+      "attrs": {
+        "value": "10000"
+      }
+    }
   ],
   "connections": [
-    [ "stm32:A9",  "$serialMonitor:RX", "", [] ],
-    [ "stm32:A10", "$serialMonitor:TX", "", [] ]
+    [
+      "stm32:A9",
+      "$serialMonitor:RX",
+      "green",
+      []
+    ],
+    [
+      "stm32:A10",
+      "$serialMonitor:TX",
+      "green",
+      []
+    ],
+    [
+      "dht:VCC",
+      "stm32:3V3.1",
+      "red",
+      []
+    ],
+    [
+      "dht:GND",
+      "stm32:GND.1",
+      "black",
+      []
+    ],
+    [
+      "dht:SDA",
+      "stm32:B0",
+      "yellow",
+      []
+    ],
+    [
+      "dhtPullup:1",
+      "dht:SDA",
+      "yellow",
+      []
+    ],
+    [
+      "dhtPullup:2",
+      "stm32:3V3.1",
+      "red",
+      []
+    ]
   ],
-  "dependencies": {}
+  "serialMonitor": {
+    "display": "always",
+    "newline": "lf",
+    "convertEol": true
+  }
 }
