@@ -8,6 +8,7 @@
 #include "ssd1306.h"
 #include "encoder.h"
 #include "navigation.h"
+#include "alarm_logic.h"
 
 namespace {
 
@@ -295,7 +296,20 @@ void AlarmTask(void *argument)
     SensorData received = {};
     for (;;) {
         if (xQueueReceive(alarmSensorQueue, &received, portMAX_DELAY) == pdPASS) {
-            PrintReceived("AlarmTask", received);
+            const AlarmState state = evaluateTemperature(received.temperature);
+            const char *name = "NORMAL";
+            switch (state) {
+                case AlarmState::NORMAL: name = "NORMAL"; break;
+                case AlarmState::LOW_TEMPERATURE: name = "LOW_TEMPERATURE"; break;
+                case AlarmState::HIGH_TEMPERATURE: name = "HIGH_TEMPERATURE"; break;
+            }
+            char temperature[20];
+            char line[100];
+            FormatTemperature(received.temperature, temperature, sizeof(temperature));
+            std::snprintf(line, sizeof(line), "[AlarmTask] T=%s C | State=%s\r\n",
+                          temperature, name);
+            Serial_Print(line);
+            // Hardware action is intentionally separate; add buzzer control later.
         }
     }
 }
