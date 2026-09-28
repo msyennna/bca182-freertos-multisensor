@@ -1,4 +1,4 @@
-#include "encoder.h"
+#include "input.h"
 #include "navigation.h"
 #include "stm32f1xx_hal.h"
 #include "FreeRTOS.h"

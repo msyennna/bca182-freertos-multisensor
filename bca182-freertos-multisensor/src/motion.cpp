@@ -1,5 +1,5 @@
-#include "motion_task.h"
-#include "motion_logic.h"
+#include "motion.h"
+#include "system_state.h"
 #include "stm32f1xx_hal.h"
 #include "FreeRTOS.h"
 #include "task.h"
