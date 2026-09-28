@@ -29,6 +29,15 @@
       "attrs": {
         "value": "10000"
       }
+    },
+    {
+      "type": "wokwi-photoresistor-sensor",
+      "id": "ldr",
+      "top": 90,
+      "left": -80,
+      "attrs": {
+        "lux": "500"
+      }
     }
   ],
   "connections": [
@@ -72,6 +81,24 @@
       "dhtPullup:2",
       "stm32:3V3.1",
       "red",
+      []
+    ],
+    [
+      "ldr:VCC",
+      "stm32:3V3.1",
+      "red",
+      []
+    ],
+    [
+      "ldr:GND",
+      "stm32:GND.1",
+      "black",
+      []
+    ],
+    [
+      "ldr:AO",
+      "stm32:A0",
+      "orange",
       []
     ]
   ],

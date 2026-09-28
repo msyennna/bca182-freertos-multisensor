@@ -146,14 +146,31 @@ void PrintReading(const char *label, float value, const char *unit)
     Serial_Print(line);
 }
 
+// ADC1 channel 0 (PA0), 12-bit raw range 0..4095.
+// Percentage of ADC full scale, NOT calibrated lux or brightness percent.
+bool ReadLdr(uint32_t &raw, uint32_t &percent)
+{
+    if (HAL_ADC_Start(&hadc1) != HAL_OK) {
+        HAL_ADC_Stop(&hadc1);
+        return false;
+    }
+    if (HAL_ADC_PollForConversion(&hadc1, 100) != HAL_OK) {
+        HAL_ADC_Stop(&hadc1);
+        return false;
+    }
+    raw = HAL_ADC_GetValue(&hadc1);
+    const HAL_StatusTypeDef stopped = HAL_ADC_Stop(&hadc1);
+    if (stopped != HAL_OK || raw > 4095U) return false;
+    percent = (raw * 100U + 2047U) / 4095U; // Rounded to nearest integer.
+    return true;
+}
+
 void SensorTask(void *argument)
 {
     (void)argument;
-       Serial_WriteRaw("[TEST] SensorTask started\r\n");
-
+    Serial_WriteRaw("[SensorTask] started\r\n");
+    // Let the sensor stabilize before the first transaction.
     vTaskDelay(pdMS_TO_TICKS(2000));
-
-    Serial_WriteRaw("[TEST] Two-second delay finished\r\n");
 
     for (;;) {
         float temperature = 0.0f;
@@ -161,23 +178,33 @@ void SensorTask(void *argument)
 
         // Protect the short microsecond-timed transaction from tick interrupts.
         // TIM4 keeps counting while interrupts are masked.
-                Serial_WriteRaw("[TEST] Reading DHT22...\r\n");
-
         taskENTER_CRITICAL();
         const bool valid = ReadDHT22(temperature, humidity);
         taskEXIT_CRITICAL();
 
-        Serial_WriteRaw(valid
-            ? "[TEST] DHT22 read OK\r\n"
-            : "[TEST] DHT22 read failed\r\n");
-
         if (valid) {
             PrintReading("Temperature", temperature, "C");
             PrintReading("Humidity", humidity, "%");
-            Serial_Print("\r\n");
+
         } else {
             Serial_Print("DHT22 read failed: check VCC, GND, PB0 and pull-up.\r\n");
         }
+
+        // ADC polling is outside the DHT critical section.
+        // Read the LDR even if the DHT22 transaction failed.
+        uint32_t raw = 0U;
+        uint32_t percent = 0U;
+        if (ReadLdr(raw, percent)) {
+            char line[80];
+            std::snprintf(line, sizeof(line),
+                          "LDR ADC: %lu / 4095 | ADC level: %lu %%\r\n",
+                          static_cast<unsigned long>(raw),
+                          static_cast<unsigned long>(percent));
+            Serial_Print(line);
+        } else {
+            Serial_Print("LDR ADC read failed: check ADC setup and PA0 wiring.\r\n");
+        }
+        Serial_Print("\r\n");
 
         // BLOCKED for two seconds between readings; Idle can run.
         vTaskDelay(pdMS_TO_TICKS(2000));
@@ -205,7 +232,7 @@ int main(void)
         Stop("SensorTask creation failed\r\n");
     }
 
-    Serial_WriteRaw("DHT22 serial test: first reading in about 2 seconds.\r\n");
+    Serial_WriteRaw("DHT22 + LDR serial test: first reading in about 2 seconds.\r\n");
     vTaskStartScheduler();
     Stop("Scheduler failed to start\r\n");
 }
