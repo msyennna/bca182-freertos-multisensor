@@ -54,6 +54,16 @@
       "top": 280,
       "left": 500,
       "attrs": {}
+    },
+    {
+      "type": "wokwi-pir-motion-sensor",
+      "id": "pir",
+      "top": 260,
+      "left": -70,
+      "attrs": {
+        "delayTime": "3",
+        "inhibitTime": "1"
+      }
     }
   ],
   "connections": [
@@ -162,6 +172,24 @@
     [
       "encoder:DT",
       "stm32:B13",
+      "blue",
+      []
+    ],
+    [
+      "pir:VCC",
+      "stm32:5V.1",
+      "red",
+      []
+    ],
+    [
+      "pir:GND",
+      "stm32:GND.2",
+      "black",
+      []
+    ],
+    [
+      "pir:OUT",
+      "stm32:B1",
       "blue",
       []
     ]

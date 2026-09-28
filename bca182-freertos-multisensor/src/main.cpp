@@ -9,6 +9,7 @@
 #include "encoder.h"
 #include "navigation.h"
 #include "alarm_logic.h"
+#include "motion_task.h"
 
 namespace {
 
@@ -174,7 +175,7 @@ void SensorTask(void *argument)
         uint32_t percent = 0U;
         const bool ldrOk = ReadLdr(raw, percent);
         data.lightLevel = static_cast<int>(percent); // ADC full-scale %, not lux.
-        data.motionDetected = false; // Placeholder: PIR is not integrated yet.
+        data.motionDetected = (xEventGroupGetBits(systemEvents) & EVENT_MOTION) != 0;
 
         if (dhtOk && ldrOk) {
             // Separate length-one queues give both consumers their own copy.
@@ -208,7 +209,7 @@ void PrintReceived(const char *consumer, const SensorData &data)
     FormatTemperature(data.temperature, temperature, sizeof(temperature));
     FormatTemperature(data.humidity, humidity, sizeof(humidity));
     std::snprintf(line, sizeof(line),
-                  "[%s] T=%s C | H=%s %% | ADC level=%d %% | Motion=%s (PIR not added)\r\n",
+                  "[%s] T=%s C | H=%s %% | ADC level=%d %% | Motion=%s\r\n",
                   consumer, temperature, humidity, data.lightLevel,
                   data.motionDetected ? "YES" : "NO");
     // One mutex-protected call keeps each consumer's whole line together.
@@ -223,7 +224,7 @@ bool DrawSelectedPage(DisplayMode mode, const SensorData &data, bool fresh)
     SSD1306_DrawText(0, 0, "ROOM MONITOR");
     SSD1306_DrawText(0, 2, ModeName(mode));
     if (mode == DisplayMode::MOTION) {
-        SSD1306_DrawText(0, 4, "PIR NOT ADDED");
+        SSD1306_DrawText(0, 4, data.motionDetected ? "DETECTED" : "NONE");
     } else if (!fresh) {
         SSD1306_DrawText(0, 4, "NO FRESH DATA");
     } else {
@@ -249,11 +250,32 @@ void DisplayTask(void *argument)
     (void)argument;
     vTaskDelay(pdMS_TO_TICKS(100));
     bool oledReady = false, haveSample = false, wasFresh = false;
+    bool displaySleeping = false;
     SensorData received = {};
     DisplayMode mode = DisplayMode::TEMPERATURE;
     TickType_t lastSample = 0;
     for (;;) {
         bool changed = false;
+        if ((xEventGroupGetBits(systemEvents) & EVENT_ACTIVE) == 0) {
+            if (oledReady && !displaySleeping) {
+                SSD1306_Clear();
+                const bool blanked = SSD1306_Update();
+                const bool off = SSD1306_DisplayOff();
+                if (!blanked || !off) Serial_Print("[DisplayTask] OLED sleep I2C error\r\n");
+                Serial_Print("[DisplayTask] OLED off; waiting for motion\r\n");
+            }
+            displaySleeping = true;
+            // No periodic framebuffer/I2C work while inactive.
+            xEventGroupWaitBits(systemEvents, EVENT_ACTIVE, pdFALSE, pdTRUE, portMAX_DELAY);
+            continue;
+        }
+        if (displaySleeping) {
+            // Reinitialize on wake, which turns the display on and refreshes it.
+            displaySleeping = false;
+            oledReady = false;
+            haveSample = false;
+            Serial_Print("[DisplayTask] Resuming OLED\r\n");
+        }
         if (!oledReady) {
             oledReady = SSD1306_Init();
             if (!oledReady) {
@@ -277,6 +299,11 @@ void DisplayTask(void *argument)
             if (mode != requested) changed = true;
             mode = requested;
         }
+        const bool liveMotion = (xEventGroupGetBits(systemEvents) & EVENT_MOTION) != 0;
+        if (received.motionDetected != liveMotion) {
+            received.motionDetected = liveMotion;
+            if (mode == DisplayMode::MOTION) changed = true;
+        }
         const bool fresh = haveSample &&
             static_cast<TickType_t>(xTaskGetTickCount() - lastSample) < pdMS_TO_TICKS(5000);
         if (fresh != wasFresh) changed = true;
@@ -295,7 +322,13 @@ void AlarmTask(void *argument)
     (void)argument;
     SensorData received = {};
     for (;;) {
-        if (xQueueReceive(alarmSensorQueue, &received, portMAX_DELAY) == pdPASS) {
+        if ((xEventGroupGetBits(systemEvents) & EVENT_ACTIVE) == 0) {
+            Buzzer_Set(false);
+            Serial_Print("[AlarmTask] Paused while INACTIVE\r\n");
+            xEventGroupWaitBits(systemEvents, EVENT_ACTIVE, pdFALSE, pdTRUE, portMAX_DELAY);
+        }
+        if (xQueueReceive(alarmSensorQueue, &received, pdMS_TO_TICKS(100)) == pdPASS) {
+            if ((xEventGroupGetBits(systemEvents) & EVENT_ACTIVE) == 0) continue;
             const AlarmState state = evaluateTemperature(received.temperature);
             const char *name = "NORMAL";
             switch (state) {
@@ -331,6 +364,9 @@ int main(void)
     if (!RtosObjects_Create()) {
         Stop("RTOS object creation failed\r\n");
     }
+    if (xTaskCreate(MotionTask, "MotionTask", 256, nullptr, 1, nullptr) != pdPASS) {
+        Stop("MotionTask creation failed\r\n");
+    }
     if (xTaskCreate(SensorTask, "SensorTask", 384, nullptr, 1, nullptr) != pdPASS) {
         Stop("SensorTask creation failed\r\n");
     }
@@ -342,7 +378,7 @@ int main(void)
     if (xTaskCreate(InputTask, "InputTask", 256, nullptr, 1, nullptr) != pdPASS) {
         Stop("InputTask creation failed\r\n");
     }
-    Serial_WriteRaw("Encoder + OLED test: first reading in about 2 seconds.\r\n");
+    Serial_WriteRaw("Motion + system state test: first reading in about 2 seconds.\r\n");
     vTaskStartScheduler();
     Stop("Scheduler failed to start\r\n");
 }

@@ -134,9 +134,9 @@ bool SSD1306_Update(void)
     return true;
 }
 
-void SSD1306_DisplayOff(void)
+bool SSD1306_DisplayOff(void)
 {
-    SendCommand(0xAE);
+    return SendCommand(0xAE);
 }
 
 void SSD1306_DisplayOn(void)

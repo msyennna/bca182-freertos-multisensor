@@ -71,6 +71,19 @@ void InputTask(void *argument)
     Serial_Print("[InputTask] Encoder ready: CLK PB12, DT PB13\r\n");
     unsigned reportedOverflow = 0;
     for (;;) {
+        if ((xEventGroupGetBits(systemEvents) & EVENT_ACTIVE) == 0) {
+            // Disable capture while inactive, discard pending input, and sleep.
+            HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
+            const uint32_t mask = __get_PRIMASK();
+            __disable_irq();
+            tail = head;
+            __set_PRIMASK(mask);
+            xEventGroupWaitBits(systemEvents, EVENT_ACTIVE, pdFALSE, pdTRUE, portMAX_DELAY);
+            __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_12);
+            HAL_NVIC_ClearPendingIRQ(EXTI15_10_IRQn);
+            HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+            continue;
+        }
         int8_t turn;
         while (PopTurn(turn)) {
             mode = Navigate(mode, turn > 0);
