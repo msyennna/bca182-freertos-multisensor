@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "author": "BCA182",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-stm32-bluepill", "id": "stm32", "top": 0, "left": 0, "attrs": {} }
+  ],
+  "connections": [
+    [ "stm32:A9",  "$serialMonitor:RX", "", [] ],
+    [ "stm32:A10", "$serialMonitor:TX", "", [] ]
+  ],
+  "dependencies": {}
+}
