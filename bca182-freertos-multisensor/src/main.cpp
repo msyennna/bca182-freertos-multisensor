@@ -217,7 +217,7 @@ void PrintReceived(const char *consumer, const SensorData &data)
 }
 
 // Called only from DisplayTask: all OLED access stays with one owner.
-bool DrawSelectedPage(DisplayMode mode, const SensorData &data, bool fresh)
+bool DrawSelectedPage(DisplayMode mode, const SensorData &data, bool fresh, bool alarmActive)
 {
     char value[32];
     SSD1306_Clear();
@@ -242,6 +242,7 @@ bool DrawSelectedPage(DisplayMode mode, const SensorData &data, bool fresh)
         SSD1306_DrawText(0, 4, value);
     }
     if (mode == DisplayMode::LIGHT) SSD1306_DrawText(0, 6, "ADC LEVEL - NOT LUX");
+    if (alarmActive) SSD1306_DrawText(0, 7, "TEMP ALARM");
     return SSD1306_Update();
 }
 
@@ -251,6 +252,7 @@ void DisplayTask(void *argument)
     vTaskDelay(pdMS_TO_TICKS(100));
     bool oledReady = false, haveSample = false, wasFresh = false;
     bool displaySleeping = false;
+    bool previousAlarm = false;
     SensorData received = {};
     DisplayMode mode = DisplayMode::TEMPERATURE;
     TickType_t lastSample = 0;
@@ -308,8 +310,11 @@ void DisplayTask(void *argument)
             static_cast<TickType_t>(xTaskGetTickCount() - lastSample) < pdMS_TO_TICKS(5000);
         if (fresh != wasFresh) changed = true;
         wasFresh = fresh;
+        const bool alarmActive = (xEventGroupGetBits(systemEvents) & EVENT_ALARM) != 0;
+        if (alarmActive != previousAlarm) changed = true;
+        previousAlarm = alarmActive;
         if (changed) {
-            oledReady = DrawSelectedPage(mode, received, fresh);
+            oledReady = DrawSelectedPage(mode, received, fresh, alarmActive);
             if (!oledReady) Serial_Print("[DisplayTask] OLED update failed\r\n");
         }
         // Respond to navigation without waiting for the next 2-second sample.
@@ -323,6 +328,7 @@ void AlarmTask(void *argument)
     SensorData received = {};
     for (;;) {
         if ((xEventGroupGetBits(systemEvents) & EVENT_ACTIVE) == 0) {
+            xEventGroupClearBits(systemEvents, EVENT_ALARM);
             Buzzer_Set(false);
             Serial_Print("[AlarmTask] Paused while INACTIVE\r\n");
             xEventGroupWaitBits(systemEvents, EVENT_ACTIVE, pdFALSE, pdTRUE, portMAX_DELAY);
@@ -330,6 +336,18 @@ void AlarmTask(void *argument)
         if (xQueueReceive(alarmSensorQueue, &received, pdMS_TO_TICKS(100)) == pdPASS) {
             if ((xEventGroupGetBits(systemEvents) & EVENT_ACTIVE) == 0) continue;
             const AlarmState state = evaluateTemperature(received.temperature);
+            // Persistent state flag, not a counted/one-shot notification.
+            const bool alarmActive = state != AlarmState::NORMAL;
+            const bool previouslySet = (xEventGroupGetBits(systemEvents) & EVENT_ALARM) != 0;
+            if (alarmActive) {
+                xEventGroupSetBits(systemEvents, EVENT_ALARM);
+            } else {
+                xEventGroupClearBits(systemEvents, EVENT_ALARM);
+            }
+            if (alarmActive != previouslySet) {
+                Serial_Print(alarmActive ? "[Event] EVENT_ALARM SET\r\n"
+                                         : "[Event] EVENT_ALARM CLEARED\r\n");
+            }
             const char *name = "NORMAL";
             switch (state) {
                 case AlarmState::NORMAL: name = "NORMAL"; break;
