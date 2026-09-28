@@ -9,7 +9,7 @@ The device samples a DHT22 and an ADC connected to a photoresistor every two sec
 ## Features
 
 - Temperature and relative humidity from DHT22.
-- Relative ADC light level, expressed as a percentage of full scale; **not calibrated lux**.
+- Relative ADC light level, expressed as a percentage of full scale.
 - Motion indication and automatic display sleep/reactivation.
 - Four OLED pages: Temperature, Humidity, Light, Motion.
 - Low and high temperature alarms with a buzzer.
