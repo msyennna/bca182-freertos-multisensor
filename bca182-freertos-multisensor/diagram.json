@@ -47,6 +47,13 @@
       "attrs": {
         "i2cAddress": "0x3c"
       }
+    },
+    {
+      "type": "wokwi-ky-040",
+      "id": "encoder",
+      "top": 280,
+      "left": 500,
+      "attrs": {}
     }
   ],
   "connections": [
@@ -132,6 +139,30 @@
       "oled:SDA",
       "stm32:B7",
       "green",
+      []
+    ],
+    [
+      "encoder:VCC",
+      "stm32:3V3.2",
+      "red",
+      []
+    ],
+    [
+      "encoder:GND",
+      "stm32:GND.3",
+      "black",
+      []
+    ],
+    [
+      "encoder:CLK",
+      "stm32:B12",
+      "purple",
+      []
+    ],
+    [
+      "encoder:DT",
+      "stm32:B13",
+      "blue",
       []
     ]
   ],

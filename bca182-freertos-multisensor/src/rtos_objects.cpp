@@ -11,7 +11,11 @@ bool RtosObjects_Create(void)
 {
     displaySensorQueue = xQueueCreate(1, sizeof(SensorData));
     alarmSensorQueue = xQueueCreate(1, sizeof(SensorData));
+    displayModeQueue = xQueueCreate(1, sizeof(DisplayMode));
     serialMutex = xSemaphoreCreateMutex();
+    if (displayModeQueue == nullptr) return false;
+    DisplayMode initialMode = DisplayMode::TEMPERATURE;
+    xQueueOverwrite(displayModeQueue, &initialMode);
     return displaySensorQueue != nullptr && alarmSensorQueue != nullptr &&
            serialMutex != nullptr;
 }
