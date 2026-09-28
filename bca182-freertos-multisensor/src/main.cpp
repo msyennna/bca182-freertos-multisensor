@@ -5,6 +5,7 @@
 #include "hardware.h"
 #include "serial_log.h"
 #include "rtos_objects.h"
+#include "ssd1306.h"
 
 namespace {
 
@@ -211,15 +212,59 @@ void PrintReceived(const char *consumer, const SensorData &data)
     Serial_Print(line);
 }
 
+// OLED initialization, framebuffer access and I2C updates belong to this task.
 void DisplayTask(void *argument)
 {
     (void)argument;
+    vTaskDelay(pdMS_TO_TICKS(100));
+    bool oledReady = false;
     SensorData received = {};
     for (;;) {
-        // BLOCKED until this consumer's queue contains a sample.
-        if (xQueueReceive(displaySensorQueue, &received, portMAX_DELAY) == pdPASS) {
-            PrintReceived("DisplayTask", received);
+        if (!oledReady) {
+            if (!SSD1306_Init()) {
+                Serial_Print("[DisplayTask] OLED init failed: check PB6/PB7 and address 0x3C.\r\n");
+                vTaskDelay(pdMS_TO_TICKS(1000));
+                continue;
+            }
+            SSD1306_Clear();
+            SSD1306_DrawText(0, 0, "ROOM MONITOR");
+            SSD1306_DrawText(0, 2, "Temperature");
+            SSD1306_DrawText(0, 4, "WAITING...");
+            oledReady = SSD1306_Update();
+            if (!oledReady) {
+                Serial_Print("[DisplayTask] OLED update failed\r\n");
+                vTaskDelay(pdMS_TO_TICKS(1000));
+                continue;
+            }
+            Serial_Print("[DisplayTask] OLED ready\r\n");
         }
+
+        // If readings stop arriving, replace the old temperature with a status.
+        if (xQueueReceive(displaySensorQueue, &received, pdMS_TO_TICKS(5000)) != pdPASS) {
+            SSD1306_Clear();
+            SSD1306_DrawText(0, 0, "ROOM MONITOR");
+            SSD1306_DrawText(0, 2, "Temperature");
+            SSD1306_DrawText(0, 4, "NO FRESH DATA");
+            oledReady = SSD1306_Update();
+            if (!oledReady) Serial_Print("[DisplayTask] OLED update failed\r\n");
+            continue;
+        }
+
+        int tenths = static_cast<int>(received.temperature * 10.0f +
+                                      (received.temperature >= 0 ? 0.5f : -0.5f));
+        const bool negative = tenths < 0;
+        if (negative) tenths = -tenths;
+        char value[24];
+        std::snprintf(value, sizeof(value), "%s%d.%d C",
+                      negative ? "-" : "", tenths / 10, tenths % 10);
+
+        SSD1306_Clear();
+        SSD1306_DrawText(0, 0, "ROOM MONITOR");
+        SSD1306_DrawText(0, 2, "Temperature");
+        SSD1306_DrawText(0, 4, value);
+        oledReady = SSD1306_Update();
+        if (!oledReady) Serial_Print("[DisplayTask] OLED update failed\r\n");
+        PrintReceived("DisplayTask", received);
     }
 }
 
@@ -255,11 +300,11 @@ int main(void)
         Stop("SensorTask creation failed\r\n");
     }
 
-    if (xTaskCreate(DisplayTask, "DisplayTask", 384, nullptr, 1, nullptr) != pdPASS ||
+    if (xTaskCreate(DisplayTask, "DisplayTask", 512, nullptr, 1, nullptr) != pdPASS ||
         xTaskCreate(AlarmTask, "AlarmTask", 384, nullptr, 1, nullptr) != pdPASS) {
         Stop("Consumer task creation failed\r\n");
     }
-    Serial_WriteRaw("Sensor queue test: first reading in about 2 seconds.\r\n");
+    Serial_WriteRaw("OLED + sensor queue test: first reading in about 2 seconds.\r\n");
     vTaskStartScheduler();
     Stop("Scheduler failed to start\r\n");
 }
