@@ -133,19 +133,6 @@ bool ReadDHT22(float &temperature, float &humidity)
     return true;
 }
 
-// Integer formatting avoids requiring printf floating-point support.
-void PrintReading(const char *label, float value, const char *unit)
-{
-    int tenths = static_cast<int>(value * 10.0f + (value >= 0 ? 0.5f : -0.5f));
-    const bool negative = tenths < 0;
-    if (negative) tenths = -tenths;
-    char line[64];
-    std::snprintf(line, sizeof(line), "%s: %s%d.%02d %s\r\n",
-                  label, negative ? "-" : "", tenths / 10,
-                  (tenths % 10) * 10, unit);
-    Serial_Print(line);
-}
-
 // ADC1 channel 0 (PA0), 12-bit raw range 0..4095.
 // Percentage of ADC full scale, NOT calibrated lux or brightness percent.
 bool ReadLdr(uint32_t &raw, uint32_t &percent)
@@ -165,54 +152,85 @@ bool ReadLdr(uint32_t &raw, uint32_t &percent)
     return true;
 }
 
+// The queue copies this task-local structure into each consumer's mailbox.
 void SensorTask(void *argument)
 {
     (void)argument;
-
-    Serial_WriteRaw("[SensorTask] started\r\n");
-
-    // One-time startup delay for the DHT22.
-    vTaskDelay(pdMS_TO_TICKS(2000));
-
-    // Reference time for periodic sampling.
+    Serial_Print("[SensorTask] started\r\n");
+    vTaskDelay(pdMS_TO_TICKS(2000)); // One-time sensor startup delay.
     TickType_t lastWakeTime = xTaskGetTickCount();
 
     for (;;) {
-        float temperature = 0.0f;
-        float humidity = 0.0f;
-
-        // Protect the short microsecond-timed transaction from tick interrupts.
-        // TIM4 keeps counting while interrupts are masked.
+        SensorData data = {};
         taskENTER_CRITICAL();
-        const bool valid = ReadDHT22(temperature, humidity);
+        const bool dhtOk = ReadDHT22(data.temperature, data.humidity);
         taskEXIT_CRITICAL();
 
-        if (valid) {
-            PrintReading("Temperature", temperature, "C");
-            PrintReading("Humidity", humidity, "%");
-
-        } else {
-            Serial_Print("DHT22 read failed: check VCC, GND, PB0 and pull-up.\r\n");
-        }
-
-        // ADC polling is outside the DHT critical section.
-        // Read the LDR even if the DHT22 transaction failed.
         uint32_t raw = 0U;
         uint32_t percent = 0U;
-        if (ReadLdr(raw, percent)) {
-            char line[80];
-            std::snprintf(line, sizeof(line),
-                          "LDR ADC: %lu / 4095 | ADC level: %lu %%\r\n",
-                          static_cast<unsigned long>(raw),
-                          static_cast<unsigned long>(percent));
-            Serial_Print(line);
-        } else {
-            Serial_Print("LDR ADC read failed: check ADC setup and PA0 wiring.\r\n");
-        }
-        Serial_Print("\r\n");
+        const bool ldrOk = ReadLdr(raw, percent);
+        data.lightLevel = static_cast<int>(percent); // ADC full-scale %, not lux.
+        data.motionDetected = false; // Placeholder: PIR is not integrated yet.
 
-                // Wait until the next scheduled 2-second sampling time.
+        if (dhtOk && ldrOk) {
+            // Separate length-one queues give both consumers their own copy.
+            // A slow consumer gets the latest sample, not a historical backlog.
+            xQueueOverwrite(displaySensorQueue, &data);
+            xQueueOverwrite(alarmSensorQueue, &data);
+        } else {
+            // The required four-field struct has no validity flags.
+            // Do not publish zeros as measurements if acquisition failed.
+            Serial_Print("[SensorTask] Read failed; sample not published.\r\n");
+        }
         vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(2000));
+    }
+}
+
+void FormatTemperature(float value, char *text, size_t capacity)
+{
+    int tenths = static_cast<int>(value * 10.0f + (value >= 0 ? 0.5f : -0.5f));
+    const bool negative = tenths < 0;
+    if (negative) tenths = -tenths;
+    std::snprintf(text, capacity, "%s%d.%02d", negative ? "-" : "",
+                  tenths / 10, (tenths % 10) * 10);
+}
+
+// Serial-only consumers demonstrate queue reception before OLED/alarm integration.
+void PrintReceived(const char *consumer, const SensorData &data)
+{
+    char temperature[20];
+    char humidity[20];
+    char line[180];
+    FormatTemperature(data.temperature, temperature, sizeof(temperature));
+    FormatTemperature(data.humidity, humidity, sizeof(humidity));
+    std::snprintf(line, sizeof(line),
+                  "[%s] T=%s C | H=%s %% | ADC level=%d %% | Motion=%s (PIR not added)\r\n",
+                  consumer, temperature, humidity, data.lightLevel,
+                  data.motionDetected ? "YES" : "NO");
+    // One mutex-protected call keeps each consumer's whole line together.
+    Serial_Print(line);
+}
+
+void DisplayTask(void *argument)
+{
+    (void)argument;
+    SensorData received = {};
+    for (;;) {
+        // BLOCKED until this consumer's queue contains a sample.
+        if (xQueueReceive(displaySensorQueue, &received, portMAX_DELAY) == pdPASS) {
+            PrintReceived("DisplayTask", received);
+        }
+    }
+}
+
+void AlarmTask(void *argument)
+{
+    (void)argument;
+    SensorData received = {};
+    for (;;) {
+        if (xQueueReceive(alarmSensorQueue, &received, portMAX_DELAY) == pdPASS) {
+            PrintReceived("AlarmTask", received);
+        }
     }
 }
 
@@ -237,7 +255,11 @@ int main(void)
         Stop("SensorTask creation failed\r\n");
     }
 
-    Serial_WriteRaw("DHT22 + LDR serial test: first reading in about 2 seconds.\r\n");
+    if (xTaskCreate(DisplayTask, "DisplayTask", 384, nullptr, 1, nullptr) != pdPASS ||
+        xTaskCreate(AlarmTask, "AlarmTask", 384, nullptr, 1, nullptr) != pdPASS) {
+        Stop("Consumer task creation failed\r\n");
+    }
+    Serial_WriteRaw("Sensor queue test: first reading in about 2 seconds.\r\n");
     vTaskStartScheduler();
     Stop("Scheduler failed to start\r\n");
 }

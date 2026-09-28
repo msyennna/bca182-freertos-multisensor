@@ -7,7 +7,6 @@ struct SensorData {
     float humidity;
     int lightLevel;
     bool motionDetected;
-    bool dhtValid;
 };
 
 enum class DisplayMode : uint8_t {
