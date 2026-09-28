@@ -24,7 +24,7 @@ void WriteUnsigned(unsigned value)
     }
 
     while (count > 0U) {
-        char text[2] = {digits[--count], '\0'};
+        const char text[2] = {digits[--count], '\0'};
         Serial_WriteRaw(text);
     }
 }

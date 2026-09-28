@@ -16,5 +16,4 @@ extern TIM_HandleTypeDef htim2;
 #endif
 
 void Hardware_Init(void);
-bool Hardware_VectorTableOk(void);
 void Buzzer_Set(bool enabled);

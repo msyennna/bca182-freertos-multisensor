@@ -139,7 +139,3 @@ bool SSD1306_DisplayOff(void)
     return SendCommand(0xAE);
 }
 
-void SSD1306_DisplayOn(void)
-{
-    SendCommand(0xAF);
-}
