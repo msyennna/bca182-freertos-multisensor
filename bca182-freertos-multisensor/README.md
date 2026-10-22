@@ -32,7 +32,7 @@ flowchart LR
 
 *Figure 1. Sensors and user input feed the STM32, which controls the display, alarm, and diagnostics.*
 
-![Wokwi circuit with labeled sensor and actuator wiring](docs/images/wokwi-circuit.png)
+![Wokwi circuit with labeled sensor and actuator wiring](bca182-freertos-multisensor/docs/images/wokwi-circuit.png)
 
 *Figure 2. Wokwi circuit and pin connections. *
 
@@ -137,7 +137,7 @@ The Wokwi firmware path is `.pio/build/bluepill_f103c8/firmware.bin`. Rebuild af
 
 Open the project in VS Code, build it, then use **Wokwi: Start Simulator** from the Command Palette. The DHT22 values can be changed by clicking the sensor; use the encoder arrows for page changes and **Simulate Motion** on the PIR. Refer to `docs/functional-verification.md` for the ten test stimuli and observed results.
 
-![Finished Wokwi simulation showing the OLED and serial diagnostics](docs/images/finished-system.png)
+![Finished Wokwi simulation showing the OLED and serial diagnostics](bca182-freertos-multisensor/docs/images/finished-system.png)
 
 *Figure 5. Finished system in Wokwi. *
 
