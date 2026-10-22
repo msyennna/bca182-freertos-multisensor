@@ -34,7 +34,7 @@ flowchart LR
 
 ![Wokwi circuit with labeled sensor and actuator wiring](docs/images/wokwi-circuit.png)
 
-*Figure 2. Wokwi circuit and pin connections. *
+*Figure 2. Wokwi circuit and pin connections.*
 
 ## FreeRTOS Architecture
 
@@ -139,7 +139,7 @@ Open the project in VS Code, build it, then use **Wokwi: Start Simulator** from 
 
 ![Finished Wokwi simulation showing the OLED and serial diagnostics](docs/images/finished-system.png)
 
-*Figure 5. Finished system in Wokwi. *
+*Figure 5. Finished system in Wokwi.*
 
 ## Unit Testing
 
